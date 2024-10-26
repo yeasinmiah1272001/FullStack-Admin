@@ -1,12 +1,70 @@
 import usermodel from "../models/userModels.js";
 import validator from "validator";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
-const userLogin = async (req, res) => {};
+const createToken = (user) => {
+  return jwt.sign(
+    {
+      _id: user._id,
+      email: user.email,
+      password: user.name,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "10h" }
+  );
+};
+
+const userLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email) {
+      return res.json({ success: false, message: "pleace email is requred" });
+    }
+    if (!password) {
+      return res.json({
+        success: false,
+        message: "pleace password is requred",
+      });
+    }
+
+    const user = await usermodel.findOne({ email });
+    if (!user) {
+      return res.json({ success: false, message: "user does not exit" });
+    }
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (isMatch) {
+      const token = createToken(user);
+      res.json({ success: true, token, message: "user login success" });
+    } else {
+      return res.json({
+        success: false,
+        message: "invalid creadiantial, pleace try again",
+      });
+    }
+  } catch (error) {
+    console.log("User Login error", error);
+    res.json({ success: true, message: error.message });
+  }
+};
+
 const userRegister = async (req, res) => {
   try {
     const { name, email, password } = await req.body;
-    console.log("body", name);
+
     const existinguser = await usermodel.findOne({ email });
+    if (!name) {
+      return res.json({ success: false, message: "pleace name is requred" });
+    }
+    if (!email) {
+      return res.json({ success: false, message: "pleace email is requred" });
+    }
+    if (!password) {
+      return res.json({
+        success: false,
+        message: "pleace password is requred",
+      });
+    }
     // email validation
     if (!validator.isEmail(email)) {
       return res.json({
@@ -26,12 +84,14 @@ const userRegister = async (req, res) => {
         message: "pleace password must be 8 chr",
       });
     }
+    const salt = await bcrypt.genSalt(10);
+    const encryptPassword = await bcrypt.hash(password, salt);
 
     // new user create
     const newUser = new usermodel({
       name,
       email,
-      password,
+      password: encryptPassword,
     });
 
     // save database
@@ -39,7 +99,7 @@ const userRegister = async (req, res) => {
 
     res.json({
       success: true,
-      message: "api connected successfull",
+      message: "user register successfull",
     });
   } catch (error) {
     console.log("register error", error);
@@ -47,11 +107,84 @@ const userRegister = async (req, res) => {
   }
 };
 
-const addmiinLogin = async (req, res) => {};
-const removeUser = async (req, res) => {};
-const updateUser = async (req, res) => {};
+const addmiinLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (
+      email === process.env.ADMIN_EMAIL &&
+      password === process.env.ADMIN_PASSWORD
+    ) {
+      const token = jwt.sign(email + password, process.env.JWT_SECRET);
+      res.send({
+        success: true,
+        token,
+        message: "wellcome add user login success",
+      });
+    } else {
+      res.json({
+        success: false,
+        message: "invalid credintials, pleace login",
+      });
+    }
+  } catch (error) {
+    console.log("Admin Login error", error);
+    res.json({ success: true, message: error.message });
+  }
+};
+
+const removeUser = async (req, res) => {
+  try {
+    await usermodel.findByIdAndDelete(req.body._id);
+    res.json({ success: true, message: "user deleted success" });
+  } catch (error) {
+    console.log("remove user error", error);
+    res.json({ success: true, message: error.message });
+  }
+};
+
+const updateUser = async (req, res) => {
+  try {
+    const { _id, name, email, password } = req.body;
+    const user = await usermodel.findById(_id);
+    if (!user) {
+      return res.json({ success: false, message: "user not found" });
+    }
+    if (user) user.name = user;
+    // email update
+    if (!validator.isEmail(email)) {
+      return res.json({
+        success: false,
+        message: "pleace enter a validate email",
+      });
+    }
+    user.email = email;
+    // password update
+    if (password) {
+      if (email.length < 8) {
+        return res.json({
+          success: true,
+          message: "pleace password must be 8 chr",
+        });
+      }
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+    }
+    await user.save();
+    res.json({ success: true, message: "user updated success" });
+  } catch (error) {
+    console.log("Update user error", error);
+    res.json({ success: true, message: error.message });
+  }
+};
 const getUsers = async (req, res) => {
-  res.send("hello user");
+  try {
+    const total = await usermodel.countDocuments({});
+    const user = await usermodel.find({});
+    res.json({ success: true, total, user });
+  } catch (error) {
+    console.log("all user get error", error);
+    res.json({ success: true, message: error.message });
+  }
 };
 
 export {

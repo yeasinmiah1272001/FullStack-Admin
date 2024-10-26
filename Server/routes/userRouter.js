@@ -7,6 +7,7 @@ import {
   userLogin,
   userRegister,
 } from "../controllers/userContoller.js";
+import adminAuth from "../middleware/adminAuth.js";
 
 const userRouter = express.Router();
 
@@ -17,8 +18,8 @@ const userRouter = express.Router();
 userRouter.post("/login", userLogin);
 userRouter.post("/register", userRegister);
 userRouter.post("/addmin", addmiinLogin);
-userRouter.post("/remove", removeUser);
+userRouter.post("/remove/:id", removeUser);
 userRouter.put("/update/:id", updateUser);
-userRouter.get("/users", getUsers);
+userRouter.get("/users", adminAuth, getUsers);
 
 export default userRouter;
